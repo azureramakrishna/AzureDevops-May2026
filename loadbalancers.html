@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Azure Load Balancers — Deep Dive</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --azure-blue: #0078D4;
+    --azure-dark: #003057;
+    --azure-cyan: #00B7C3;
+    --azure-light: #50E6FF;
+    --bg: #06090F;
+    --surface: #0D1117;
+    --surface2: #161B22;
+    --border: rgba(0,120,212,0.25);
+    --text: #E6EDF3;
+    --muted: #7D8590;
+    --accent: #00B7C3;
+    --green: #3FB950;
+    --yellow: #D29922;
+    --red: #F85149;
+
+    --alb: #0078D4;
+    --albg: #003A6B;
+    --agw: #7B2FBE;
+    --agwg: #3D1760;
+    --fd: #D13438;
+    --fdg: #6B1A1C;
+    --tm: #107C10;
+    --tmg: #0A3D0A;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    overflow-x: hidden;
+  }
+
+  /* ─── HERO ─── */
+  .hero {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 4rem 2rem;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0,120,212,0.35) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 30% at 80% 80%, rgba(0,183,195,0.15) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  .grid-bg {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,120,212,0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,120,212,0.07) 1px, transparent 1px);
+    background-size: 60px 60px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 0%, transparent 70%);
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0,120,212,0.15);
+    border: 1px solid rgba(0,120,212,0.4);
+    border-radius: 999px;
+    padding: 6px 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--azure-light);
+    letter-spacing: 0.1em;
+    margin-bottom: 1.5rem;
+    animation: fadeUp 0.6s ease both;
+  }
+
+  .hero-badge::before {
+    content: '';
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--azure-cyan);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  .hero h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(2.5rem, 7vw, 5.5rem);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    animation: fadeUp 0.6s 0.1s ease both;
+    max-width: 900px;
+  }
+
+  .hero h1 span {
+    background: linear-gradient(135deg, var(--azure-blue), var(--azure-cyan), var(--azure-light));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-sub {
+    margin-top: 1.5rem;
+    color: var(--muted);
+    font-size: 1.1rem;
+    max-width: 600px;
+    line-height: 1.7;
+    animation: fadeUp 0.6s 0.2s ease both;
+  }
+
+  .hero-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 2.5rem;
+    justify-content: center;
+    animation: fadeUp 0.6s 0.3s ease both;
+  }
+
+  .hero-nav a {
+    text-decoration: none;
+    padding: 10px 22px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    border: 1px solid;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+
+  .nav-alb { color: #50acff; border-color: rgba(0,120,212,0.5); background: rgba(0,120,212,0.1); }
+  .nav-agw { color: #c07eff; border-color: rgba(123,47,190,0.5); background: rgba(123,47,190,0.1); }
+  .nav-fd  { color: #ff7b7e; border-color: rgba(209,52,56,0.5);  background: rgba(209,52,56,0.1); }
+  .nav-tm  { color: #5ec75e; border-color: rgba(16,124,16,0.5);  background: rgba(16,124,16,0.1); }
+
+  .hero-nav a:hover { filter: brightness(1.3); transform: translateY(-2px); }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ─── SECTION WRAPPER ─── */
+  .section {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 5rem 2rem;
+  }
+
+  .section-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--azure-cyan);
+    margin-bottom: 0.75rem;
+  }
+
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(1.8rem, 4vw, 2.8rem);
+    font-weight: 700;
+    margin-bottom: 1rem;
+    letter-spacing: -0.02em;
+  }
+
+  .section-desc {
+    color: var(--muted);
+    max-width: 620px;
+    line-height: 1.7;
+    margin-bottom: 3rem;
+  }
+
+  /* ─── OSI OVERVIEW ─── */
+  .osi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .lb-card {
+    position: relative;
+    border-radius: 16px;
+    padding: 2rem;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    overflow: hidden;
+    transition: transform 0.3s, box-shadow 0.3s;
+    cursor: pointer;
+  }
+
+  .lb-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+
+  .lb-card:hover { transform: translateY(-6px); box-shadow: 0 24px 60px rgba(0,0,0,0.5); }
+
+  .card-alb::before { background: linear-gradient(90deg, var(--alb), var(--azure-cyan)); }
+  .card-agw::before { background: linear-gradient(90deg, var(--agw), #c07eff); }
+  .card-fd::before  { background: linear-gradient(90deg, var(--fd), #ff9d9f); }
+  .card-tm::before  { background: linear-gradient(90deg, var(--tm), #5ec75e); }
+
+  .card-icon {
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.5rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .icon-alb { background: rgba(0,120,212,0.2); }
+  .icon-agw { background: rgba(123,47,190,0.2); }
+  .icon-fd  { background: rgba(209,52,56,0.2); }
+  .icon-tm  { background: rgba(16,124,16,0.2); }
+
+  .card-name {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 1.2rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .card-layer {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-bottom: 1rem;
+    letter-spacing: 0.05em;
+  }
+
+  .card-desc {
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin-bottom: 1.25rem;
+  }
+
+  .tag-list {
+    display: flex; flex-wrap: wrap; gap: 6px;
+  }
+
+  .tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid;
+  }
+
+  .tag-alb { color: #50acff; border-color: rgba(0,120,212,0.4); background: rgba(0,120,212,0.1); }
+  .tag-agw { color: #c07eff; border-color: rgba(123,47,190,0.4); background: rgba(123,47,190,0.1); }
+  .tag-fd  { color: #ff7b7e; border-color: rgba(209,52,56,0.4);  background: rgba(209,52,56,0.1); }
+  .tag-tm  { color: #5ec75e; border-color: rgba(16,124,16,0.4);  background: rgba(16,124,16,0.1); }
+
+  /* ─── DETAILED SECTIONS ─── */
+  .detail-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    overflow: hidden;
+    margin-bottom: 2.5rem;
+  }
+
+  .detail-header {
+    padding: 2rem 2.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+  }
+
+  .detail-header:hover { background: rgba(255,255,255,0.02); }
+
+  .detail-header-icon {
+    width: 52px; height: 52px;
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.6rem;
+    flex-shrink: 0;
+  }
+
+  .dh-alb { background: rgba(0,120,212,0.2); }
+  .dh-agw { background: rgba(123,47,190,0.2); }
+  .dh-fd  { background: rgba(209,52,56,0.2); }
+  .dh-tm  { background: rgba(16,124,16,0.2); }
+
+  .detail-header-info { flex: 1; }
+
+  .detail-header-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin-bottom: 0.2rem;
+  }
+
+  .detail-header-sub {
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+
+  .chevron {
+    color: var(--muted);
+    transition: transform 0.3s;
+    font-size: 1.2rem;
+  }
+
+  .detail-body {
+    display: none;
+    padding: 2.5rem;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .detail-body.open { display: block; }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .detail-item {
+    background: var(--surface2);
+    border-radius: 12px;
+    padding: 1.5rem;
+  }
+
+  .detail-item-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .detail-item-title span { font-size: 1rem; }
+
+  .detail-item-content {
+    font-size: 0.9rem;
+    line-height: 1.7;
+    color: var(--text);
+  }
+
+  .feature-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .feature-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 0.875rem;
+    color: #cdd6e0;
+    line-height: 1.5;
+  }
+
+  .feature-list li::before {
+    content: '→';
+    flex-shrink: 0;
+    margin-top: 1px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+  }
+
+  .li-alb li::before { color: var(--azure-blue); }
+  .li-agw li::before { color: var(--agw); }
+  .li-fd  li::before { color: var(--fd); }
+  .li-tm  li::before { color: var(--tm); }
+
+  .use-case-chips {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 0.75rem;
+  }
+
+  .uc-chip {
+    font-size: 0.78rem;
+    padding: 5px 12px;
+    border-radius: 8px;
+    background: var(--surface);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--muted);
+  }
+
+  .arch-diagram {
+    background: var(--surface2);
+    border-radius: 12px;
+    padding: 1.5rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    color: #8B949E;
+    line-height: 1.9;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  /* ─── COMPARISON TABLE ─── */
+  .table-wrap {
+    overflow-x: auto;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 700px;
+  }
+
+  thead th {
+    background: var(--surface2);
+    padding: 1rem 1.25rem;
+    text-align: left;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  thead th:first-child { color: var(--text); }
+
+  tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: background 0.15s;
+  }
+
+  tbody tr:hover { background: rgba(0,120,212,0.04); }
+  tbody tr:last-child { border-bottom: none; }
+
+  td {
+    padding: 0.875rem 1.25rem;
+    font-size: 0.875rem;
+    vertical-align: top;
+    line-height: 1.5;
+  }
+
+  td:first-child {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--text);
+    white-space: nowrap;
+    font-weight: 500;
+  }
+
+  .cell-alb { color: #50acff; }
+  .cell-agw { color: #c07eff; }
+  .cell-fd  { color: #ff7b7e; }
+  .cell-tm  { color: #5ec75e; }
+
+  .check { color: var(--green); }
+  .cross { color: var(--red); }
+  .partial { color: var(--yellow); }
+
+  /* ─── DECISION GUIDE ─── */
+  .decision-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.25rem;
+  }
+
+  .decision-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.75rem;
+  }
+
+  .decision-card h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .dc-q {
+    color: var(--muted);
+    font-size: 0.875rem;
+    line-height: 1.6;
+    font-style: italic;
+    margin-bottom: 0.75rem;
+    padding-left: 0.75rem;
+    border-left: 2px solid rgba(255,255,255,0.1);
+  }
+
+  .dc-ans {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    font-weight: 500;
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 6px;
+  }
+
+  .ans-alb { color: #50acff; background: rgba(0,120,212,0.15); }
+  .ans-agw { color: #c07eff; background: rgba(123,47,190,0.15); }
+  .ans-fd  { color: #ff7b7e; background: rgba(209,52,56,0.15); }
+  .ans-tm  { color: #5ec75e; background: rgba(16,124,16,0.15); }
+
+  /* ─── DIVIDER ─── */
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    margin: 0 2rem;
+  }
+
+  /* ─── FOOTER ─── */
+  footer {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+    border-top: 1px solid rgba(255,255,255,0.05);
+  }
+
+  footer strong { color: var(--azure-cyan); font-family: 'DM Mono', monospace; }
+
+  /* ─── SCROLL ANIMATIONS ─── */
+  .reveal {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,120,212,0.3); border-radius: 3px; }
+
+  /* ─── VM DEMO HEADER ─── */
+  .vm-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(6, 9, 15, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(0, 120, 212, 0.3);
+    padding: 0 2rem;
+    box-shadow: 0 4px 32px rgba(0, 120, 212, 0.12);
+  }
+
+  .vm-header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(0,120,212,0.06) 0%, transparent 50%, rgba(0,183,195,0.04) 100%);
+    pointer-events: none;
+  }
+
+  .vm-header-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+  }
+
+  .vm-dot-ring {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(0,183,195,0.4);
+    display: flex; align-items: center; justify-content: center;
+    animation: ring-pulse 2.5s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes ring-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(0,183,195,0.3); }
+    50%       { box-shadow: 0 0 0 6px rgba(0,183,195,0); }
+  }
+
+  .vm-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--azure-cyan);
+    animation: dot-beat 2.5s ease-in-out infinite;
+  }
+
+  @keyframes dot-beat {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.7; transform: scale(0.85); }
+  }
+
+  .vm-header-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex-shrink: 0;
+  }
+
+  .vm-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+    line-height: 1;
+  }
+
+  .vm-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--text);
+    letter-spacing: -0.02em;
+  }
+
+  .vm-num {
+    color: var(--azure-cyan);
+  }
+
+  .vm-divider-v {
+    width: 1px;
+    height: 28px;
+    background: rgba(255,255,255,0.1);
+    flex-shrink: 0;
+  }
+
+  .vm-meta {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    flex: 1;
+  }
+
+  .vm-meta-item {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .vm-meta-item span {
+    color: #a8b4c0;
+  }
+
+  .vm-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    padding: 5px 14px;
+    border-radius: 999px;
+    background: rgba(0,120,212,0.12);
+    border: 1px solid rgba(0,120,212,0.35);
+    color: #50acff;
+    white-space: nowrap;
+    letter-spacing: 0.03em;
+  }
+
+  @media (max-width: 700px) {
+    .vm-meta { display: none; }
+    .vm-badge { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ─── VM01 DEMO HEADER ─── -->
+<div class="vm-header">
+  <div class="vm-header-inner">
+    <div class="vm-dot-ring">
+      <div class="vm-dot"></div>
+    </div>
+    <div class="vm-header-text">
+      <span class="vm-label">SERVING FROM</span>
+      <span class="vm-name">VM<span class="vm-num">02</span></span>
+    </div>
+    <div class="vm-divider-v"></div>
+    <div class="vm-meta">
+      <span class="vm-meta-item">🌐 <span>10.0.0.5</span></span>
+      <span class="vm-meta-item">📍 <span>East US · az-1</span></span>
+      <span class="vm-meta-item">⚡ <span>Active</span></span>
+    </div>
+    <div class="vm-badge">Azure Load Balancer · Backend Pool</div>
+  </div>
+</div>
+
+<!-- ─── HERO ─── -->
+<section class="hero">
+  <div class="grid-bg"></div>
+  <div class="hero-badge">AZURE NETWORKING · LOAD BALANCING</div>
+  <h1>Azure Load Balancers<br><span>Explained & Compared</span></h1>
+  <p class="hero-sub">A comprehensive deep dive into Azure's four load-balancing services — when to use each, how they differ, and architecture patterns.</p>
+  <nav class="hero-nav">
+    <a class="nav-alb" onclick="scrollTo('alb')">⚖️ Azure Load Balancer</a>
+    <a class="nav-agw" onclick="scrollTo('agw')">🛡️ Application Gateway</a>
+    <a class="nav-fd"  onclick="scrollTo('fd')">🌐 Front Door</a>
+    <a class="nav-tm"  onclick="scrollTo('tm')">🗺️ Traffic Manager</a>
+  </nav>
+</section>
+
+<!-- ─── OVERVIEW CARDS ─── -->
+<section class="section">
+  <p class="section-label">Overview</p>
+  <h2 class="section-title">Four Services, One Goal</h2>
+  <p class="section-desc">Azure offers distinct load-balancing services operating at different OSI layers with different scopes and capabilities. Understanding their differences is key to building resilient architectures.</p>
+
+  <div class="osi-grid">
+    <div class="lb-card card-alb reveal">
+      <div class="card-icon icon-alb">⚖️</div>
+      <div class="card-name">Azure Load Balancer</div>
+      <div class="card-layer">OSI LAYER 4 · REGIONAL · TCP / UDP</div>
+      <div class="card-desc">High-performance, ultra-low-latency Layer 4 load balancing for internal and public-facing workloads within a single Azure region.</div>
+      <div class="tag-list">
+        <span class="tag tag-alb">TCP/UDP</span>
+        <span class="tag tag-alb">Regional</span>
+        <span class="tag tag-alb">Millions RPS</span>
+        <span class="tag tag-alb">< 1ms</span>
+      </div>
+    </div>
+
+    <div class="lb-card card-agw reveal">
+      <div class="card-icon icon-agw">🛡️</div>
+      <div class="card-name">Application Gateway</div>
+      <div class="card-layer">OSI LAYER 7 · REGIONAL · HTTP / HTTPS</div>
+      <div class="card-desc">Web traffic load balancer with SSL termination, URL-based routing, WAF, session affinity, and autoscaling for web applications.</div>
+      <div class="tag-list">
+        <span class="tag tag-agw">HTTP/HTTPS</span>
+        <span class="tag tag-agw">WAF</span>
+        <span class="tag tag-agw">SSL Offload</span>
+        <span class="tag tag-agw">URL Routing</span>
+      </div>
+    </div>
+
+    <div class="lb-card card-fd reveal">
+      <div class="card-icon icon-fd">🌐</div>
+      <div class="card-name">Azure Front Door</div>
+      <div class="card-layer">OSI LAYER 7 · GLOBAL · HTTP / HTTPS</div>
+      <div class="card-desc">Global CDN and HTTP load balancer with intelligent routing, WAF, DDoS protection, and anycast acceleration across Azure's edge network.</div>
+      <div class="tag-list">
+        <span class="tag tag-fd">Global</span>
+        <span class="tag tag-fd">CDN</span>
+        <span class="tag tag-fd">Anycast</span>
+        <span class="tag tag-fd">WAF</span>
+      </div>
+    </div>
+
+    <div class="lb-card card-tm reveal">
+      <div class="card-icon icon-tm">🗺️</div>
+      <div class="card-name">Traffic Manager</div>
+      <div class="card-layer">DNS LAYER · GLOBAL · ALL PROTOCOLS</div>
+      <div class="card-desc">DNS-based global traffic distributor with multiple routing methods for directing users to the optimal endpoint based on policy and health.</div>
+      <div class="tag-list">
+        <span class="tag tag-tm">DNS-based</span>
+        <span class="tag tag-tm">Global</span>
+        <span class="tag tag-tm">Multi-protocol</span>
+        <span class="tag tag-tm">Failover</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ─── DETAILED SECTIONS ─── -->
+<section id="details" class="section">
+  <p class="section-label">Deep Dive</p>
+  <h2 class="section-title">Service Details</h2>
+  <p class="section-desc">Click each service to expand a full breakdown of features, architecture, and use cases.</p>
+
+  <!-- Azure Load Balancer -->
+  <div class="detail-block reveal" id="alb">
+    <div class="detail-header" onclick="toggle('alb-body', this)">
+      <div class="detail-header-icon dh-alb">⚖️</div>
+      <div class="detail-header-info">
+        <div class="detail-header-name">Azure Load Balancer</div>
+        <div class="detail-header-sub">Layer 4 · Regional · TCP/UDP · Low-latency infrastructure LB</div>
+      </div>
+      <div class="chevron" id="chevron-alb-body">▼</div>
+    </div>
+    <div class="detail-body" id="alb-body">
+      <div class="detail-grid">
+        <div class="detail-item">
+          <div class="detail-item-title"><span>⚙️</span> How It Works</div>
+          <div class="detail-item-content">Azure Load Balancer operates at OSI Layer 4 (Transport). It inspects TCP/UDP packet headers — IP addresses and port numbers — and distributes traffic across backend pool VMs using a 5-tuple hash (source IP, source port, destination IP, destination port, protocol). It does NOT inspect packet payloads.</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-item-title"><span>📦</span> SKUs</div>
+          <div class="detail-item-content">
+            <strong>Basic</strong> — Free, up to 300 instances, no SLA, no zone redundancy. Suitable for dev/test only.<br><br>
+            <strong>Standard</strong> — Paid, up to 1000 instances, 99.99% SLA, zone redundancy, HTTPS health probes, outbound rules, diagnostics. Required for production.
+          </div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-item-title"><span>🏗️</span> Deployment Types</div>
+          <div class="detail-item-content">
+            <strong>Public LB</strong> — Maps public IPs to VMs, enables outbound internet connectivity.<br><br>
+            <strong>Internal LB</strong> — Uses private RFC-1918 IPs, routes traffic only within a VNet or on-premises — ideal for multi-tier apps (app tier → database tier).
+          </div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-item-title"><span>✅</span> Key Features</div>
+          <ul class="feature-list li-alb">
+            <li>5-tuple or 2-tuple/3-tuple hash distribution</li>
+            <li>Health probes: TCP, HTTP, HTTPS</li>
+            <li>Inbound NAT rules for port-forwarding</li>
+            <li>Outbound rules for SNAT control</li>
+            <li>HA Ports — single rule covers all ports (Standard only)</li>
+            <li>Availability Zone redundancy (Standard only)</li>
+            <li>Floating IP for SQL Always On / NVA scenarios</li>
+            <li>Multiple frontends per single load balancer</li>
+          </ul>
+        </div>
+        <div class="detail-item">
+          <div class="detail-item-title"><span>🎯</span> Use Cases</div>
+          <div class="use-case-chips">
+            <span class="uc-chip">VM-to-VM internal traffic</span>
+            <span class="uc-chip">SQL Always On AG</span>
+            <span class="uc-chip">Network Virtual Appliances</span>
+            <span class="uc-chip">IoT / UDP workloads</span>
+            <span class="uc-chip">Game servers</span>
+            <span class="uc-chip">SMTP/FTP backends</span>
+            <span class="uc-chip">Multi-tier app tiers</span>
+          </div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-item-title"><span>⚡</span> Performance</div>
+          <div class="detail-item-content">Sub-millisecond latency. No throughput cap per rule — bounded only by VM NIC limits. Supports millions of requests per second. Passes traffic in-line; no proxy hop.</div>
+        </div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-item-title"><span>🗺️</span> Architecture Diagram</div>
+        <div class="arch-diagram">
+Internet / VNet
+     │
+     ▼
+┌────────────────────┐
+│  Azure Load         │  ← Frontend IP (Public or Private)
+│  Balancer (L4)      │  ← Load Balancing Rules (port mapping)
+│                    │  ← Health Probes (TCP/HTTP/HTTPS)
+└────────┬───────────┘
+         │  5-tuple hash
+    ┌────┴────┐
+    ▼         ▼
+ [VM 1]    [VM 2]       ← Backend Pool (VMs / VMSS)
+  :22        :22        ← Inbound NAT (port-forwarding)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Application Gateway -->
+  <div class="detail-block reveal" id="agw">
+    <div class="detail-header" onclick="toggle('agw-body', this)">
+      <div class="detail-header-icon dh-agw">🛡️</div>
+      <div class="detail-header-info">
+        <div class="detail-header-name">Application Gateway</div>
+        <div class="detail-header-sub">Layer 7 · Regional · HTTP/HTTPS/WS · Web Application Load Balancer + WAF</div>
+      </div>
+      <div class="chevron" id="chevron-agw-body">▼</div>
+    </div>
+    <div class="detail-body" id="agw-body">
+      <div class="detail-grid">
+        <div class="detail-item">
+          <div class="detail-item-title"><span>⚙️</span> How It Works</div>
+          <div class="detail-item-content">Application Gateway is a managed Layer 7 reverse proxy. It terminates TLS at the gateway, inspects full HTTP request headers, URI, hostname, and cookies — then forwards to the appropriate backend pool. Operates entirely within a single Azure region.</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-item-title"><span>📦</span> SKUs</div>
+          <div class="detail-item-content">
+            <strong>Standard v2</strong> — Autoscaling, zone redundancy, static VIP, header rewrite.<br><br>
+            <strong>WAF v2</strong> — All Standard v2 features + Web Application Firewall with OWASP 3.2 rulesets, custom rules, bot protection, rate limiting.
+          </div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-item-title"><span>✅</span> Key Features</div>
+          <ul class="feature-list li-agw">
+            <li>URL-based routing — /images/* → image pool, /api/* → API pool</li>
+            <li>Multi-site hosting — route by hostname on single gateway</li>
+            <li>SSL/TLS termination & end-to-end SSL re-encryption</li>
+            <li>Cookie-based session affinity</li>
+            <li>HTTP/2 support</li>
+            <li>WebSocket & gRPC support</li>
+            <li>Autoscaling (0 → 125 capacity units)</li>
+            <li>Header & URL rewrite rules</li>
+            <li>Custom error pages</li>
+            <li>WAF: OWASP rules, custom rules, exclusions</li>
+            <li>Private Link for internal backends</li>
+            <li>Mutual TLS (mTLS) authentication</li>
+          </ul>
+        </div>
+        <div class="detail-item">
+          <div class="detail-item-title"><span>🎯</span> Use Cases</div>
+          <div class="use-case-chips">
+            <span class="uc-chip">Microservices routing</span>
+            <span class="uc-chip">Web app SSL offloading</span>
+            <span class="uc-chip">WAF for OWASP threats</span>
+            <span class="uc-chip">Multi-tenant SaaS hosting</span>
+            <span class="uc-chip">AKS Ingress Controller</span>
+            <span class="uc-chip">API Gateway pattern</span>
+            <span class="uc-chip">Blue/Green deployments</span>
+          </div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-item-title"><span>🏗️</span> Routing Types</div>
+          <div class="detail-item-content">
+            <strong>Path-based</strong>: /api → backend-A, /static → backend-B<br>
+            <strong>Multi-site</strong>: app1.contoso.com → pool-1, app2.contoso.com → pool-2<br>
+            <strong>Redirect</strong>: HTTP → HTTPS, old path → new path<br>
+            <strong>Rewrite</strong>: Modify request/response headers or URLs
+          </div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-item-title"><span>⚡</span> Performance</div>
+          <div class="detail-item-content">Autoscales in minutes. Standard v2 can handle tens of thousands of concurrent connections. Latency is higher than ALB (~few ms) due to L7 inspection — acceptable for web workloads.</div>
+        </div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-item-title"><span>🗺️</span> Architecture Diagram</div>
+        <div class="arch-diagram">
+Client
+  │
+  ▼  TLS Termination
+┌──────────────────────────────┐
+│   Application Gateway (L7)   │
+│                              │
+│  Listener → Rule → Backend  │
+│  [WAF inspection]            │
+│  [URL path map]              │
+└──────┬──────────────┬────────┘
+       │              │
+  /api/*           /images/*
+       ▼              ▼
+  [API VMs]     [Image VMs]    ← Backend Pools
+       </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Front Door -->
+  <div class="detail-block reveal" id="fd">
+    <div class="detail-header" onclick="toggle('fd-body', this)">
+      <div class="detail-header-icon dh-fd">🌐</div>
+      <div class="detail-header-info">
+        <div class="detail-header-name">Azure Front Door</div>
+        <div class="detail-header-sub">Layer 7 · Global · HTTP/HTTPS · CDN + WAF + Intelligent Routing</div>
+      </div>
+      <div class="chevron" id="chevron-fd-body">▼</div>
+    </div>
+    <div class="detail-body" id="fd-body">
+      <div class="detail-grid">
+        <div class="detail-item">
+          <div class="detail-item-title"><span>⚙️</span> How It Works</div>
+          <div class="detail-item-content">Front Door is a global anycast platform. User requests hit the nearest of Azure's 100+ PoPs (Points of Presence) worldwide. Traffic is then forwarded to backends over Azure's private WAN backbone — dramatically faster than public internet routing. TLS is terminated at the edge PoP.</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-item-title"><span>📦</span> Tiers</div>
+          <div class="detail-item-content">
+            <strong>Standard</strong> — CDN, static caching, custom domains, SSL offload, basic routing.<br><br>
+            <strong>Premium</strong> — Standard + WAF managed rulesets, bot protection, Private Link to origins, security reports, sensitive data masking.
+          </div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-item-title"><span>✅</span> Key Features</div>
+          <ul class="feature-list li-fd">
+            <li>Global anycast with 100+ edge PoPs</li>
+            <li>Intelligent routing: Latency, Priority, Weighted, Session-affinity</li>
+            <li>Built-in CDN with caching rules</li>
+            <li>WAF with OWASP, bot protection, rate limiting</li>
+            <li>DDoS protection (L3/L4/L7)</li>
+            <li>TLS 1.3, HTTP/2, HTTP/3 (QUIC)</li>
+            <li>URL rewrite, redirect, custom headers</li>
+            <li>Health probes per origin group</li>
+            <li>Instant global failover</li>
+            <li>Private Link integration (Premium)</li>
+            <li>Real-time analytics and reports</li>
+            <li>Rules engine for advanced routing logic</li>
+          </ul>
+        </div>
+        <div class="detail-item">
+          <div class="detail-item-title"><span>🔀</span> Routing Methods</div>
+          <div class="detail-item-content">
+            <strong>Latency</strong>: Route to lowest-latency backend (default)<br>
+            <strong>Priority</strong>: Primary + failover backends<br>
+            <strong>Weighted</strong>: Split % traffic across origins (A/B testing)<br>
+            <strong>Session Affinity</strong>: Sticky sessions by client IP
+          </div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-item-title"><span>🎯</span> Use Cases</div>
+          <div class="use-case-chips">
+            <span class="uc-chip">Global web acceleration</span>
+            <span class="uc-chip">Multi-region active-active</span>
+            <span class="uc-chip">Static site CDN</span>
+            <span class="uc-chip">Global API Gateway</span>
+            <span class="uc-chip">DDoS mitigation</span>
+            <span class="uc-chip">Blue/Green global deploys</span>
+            <span class="uc-chip">SPA / Jamstack delivery</span>
+          </div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-item-title"><span>⚡</span> Performance</div>
+          <div class="detail-item-content">Anycast + Azure backbone eliminates public internet hops. Typical TTFB reduction of 30–60% vs direct origin. Cache hit = sub-10ms response from edge. TLS handshake at PoP reduces RTTs significantly for global users.</div>
+        </div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-item-title"><span>🗺️</span> Architecture Diagram</div>
+        <div class="arch-diagram">
+Users (Global)
+  │   │   │
+  US  EU  APAC  ← Anycast — nearest PoP
+  │   │   │
+  └───┴───┘
+       │
+  [Front Door Edge PoP]
+  [WAF / Cache / TLS Term]
+  [Rules Engine]
+       │
+  Azure Private Backbone
+       │
+  ┌────┴──────────────┐
+  ▼                   ▼
+[US East Origin]  [West Europe Origin]   ← Backend origins
+(App Svc/AKS/LB)  (App Svc/AKS/LB)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Traffic Manager -->
+  <div class="detail-block reveal" id="tm">
+    <div class="detail-header" onclick="toggle('tm-body', this)">
+      <div class="detail-header-icon dh-tm">🗺️</div>
+      <div class="detail-header-info">
+        <div class="detail-header-name">Traffic Manager</div>
+        <div class="detail-header-sub">DNS Layer · Global · Any Protocol · Policy-based DNS routing</div>
+      </div>
+      <div class="chevron" id="chevron-tm-body">▼</div>
+    </div>
+    <div class="detail-body" id="tm-body">
+      <div class="detail-grid">
+        <div class="detail-item">
+          <div class="detail-item-title"><span>⚙️</span> How It Works</div>
+          <div class="detail-item-content">Traffic Manager is a pure DNS service — it does NOT proxy traffic. When a client resolves your domain, Traffic Manager returns the IP of the best endpoint based on your routing policy. Actual client traffic goes directly to that endpoint. This means it works with ANY protocol (TCP, UDP, HTTP, RDP, etc.) and any endpoint (Azure, on-prem, AWS, GCP).</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-item-title"><span>🔀</span> Routing Methods</div>
+          <div class="detail-item-content">
+            <strong>Performance</strong> — Lowest DNS latency region<br>
+            <strong>Priority</strong> — Primary + failover (e.g., DR)<br>
+            <strong>Weighted</strong> — % split across endpoints<br>
+            <strong>Geographic</strong> — User's location → specific endpoint<br>
+            <strong>MultiValue</strong> — Return all healthy endpoints (IPv4/IPv6)<br>
+            <strong>Subnet</strong> — Map source IP ranges to endpoints
+          </div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-item-title"><span>✅</span> Key Features</div>
+          <ul class="feature-list li-tm">
+            <li>DNS TTL control (min 0 seconds for fast failover)</li>
+            <li>Endpoint health monitoring (HTTP/HTTPS/TCP)</li>
+            <li>Nested profiles for complex topologies</li>
+            <li>Multi-cloud and hybrid endpoints supported</li>
+            <li>Geographic compliance routing (GDPR regions)</li>
+            <li>Real User Measurements (RUM) for latency data</li>
+            <li>Traffic View analytics</li>
+            <li>Works with non-Azure endpoints</li>
+          </ul>
+        </div>
+        <div class="detail-item">
+          <div class="detail-item-title"><span>⚠️</span> Limitations</div>
+          <div class="detail-item-content">
+            <strong>No SSL offload</strong> — just DNS<br>
+            <strong>No WAF</strong> — no packet inspection<br>
+            <strong>No caching</strong> — not a CDN<br>
+            <strong>DNS TTL delay</strong> — failover is bounded by TTL + client cache (not truly instant)<br>
+            <strong>HTTP endpoints only for health probes</strong>
+          </div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-item-title"><span>🎯</span> Use Cases</div>
+          <div class="use-case-chips">
+            <span class="uc-chip">Active-active multi-region</span>
+            <span class="uc-chip">Disaster recovery failover</span>
+            <span class="uc-chip">Non-HTTP workloads</span>
+            <span class="uc-chip">Hybrid cloud routing</span>
+            <span class="uc-chip">Geographic compliance</span>
+            <span class="uc-chip">Multi-cloud (Azure+AWS)</span>
+            <span class="uc-chip">Blue/Green DNS switch</span>
+          </div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-item-title"><span>⚡</span> Performance</div>
+          <div class="detail-item-content">No added latency to data path — traffic goes direct to origin. DNS resolution adds ~1–10ms one-time overhead. Failover speed depends on health probe interval (min 10s) + TTL. Set TTL to 0–30s for fast failover scenarios.</div>
+        </div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-item-title"><span>🗺️</span> Architecture Diagram</div>
+        <div class="arch-diagram">
+Client
+  │
+  ▼
+DNS Query: myapp.trafficmanager.net
+  │
+  ▼
+[Traffic Manager]   ← Evaluates routing policy + health
+  │
+  ├─ Performance? → Returns IP of lowest-latency endpoint
+  ├─ Priority?    → Returns primary (or failover if down)
+  ├─ Geographic?  → EU user → EU endpoint, US user → US endpoint
+  └─ Weighted?    → 70% → Endpoint-A, 30% → Endpoint-B
+                            │
+                Client connects directly
+                            │
+                     [App Endpoint]
+                 (No proxy hop through TM)
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ─── COMPARISON TABLE ─── -->
+<section class="section reveal">
+  <p class="section-label">Comparison</p>
+  <h2 class="section-title">Side-by-Side Matrix</h2>
+  <p class="section-desc">A comprehensive feature comparison across all four Azure load-balancing services.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th class="cell-alb">⚖️ Load Balancer</th>
+          <th class="cell-agw">🛡️ App Gateway</th>
+          <th class="cell-fd">🌐 Front Door</th>
+          <th class="cell-tm">🗺️ Traffic Manager</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>OSI Layer</td><td>Layer 4</td><td>Layer 7</td><td>Layer 7</td><td>DNS (L3–7)</td></tr>
+        <tr><td>Scope</td><td>Regional</td><td>Regional</td><td>Global</td><td>Global</td></tr>
+        <tr><td>Protocol Support</td><td>TCP, UDP</td><td>HTTP, HTTPS, WS</td><td>HTTP, HTTPS</td><td>Any (TCP, UDP, HTTP…)</td></tr>
+        <tr><td>Traffic Proxy</td><td class="check">✓ In-line</td><td class="check">✓ Reverse proxy</td><td class="check">✓ Reverse proxy</td><td class="cross">✗ DNS only</td></tr>
+        <tr><td>SSL/TLS Termination</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td><td class="cross">✗</td></tr>
+        <tr><td>URL-Based Routing</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td><td class="cross">✗</td></tr>
+        <tr><td>Host-Based Routing</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td><td class="cross">✗</td></tr>
+        <tr><td>WAF</td><td class="cross">✗</td><td class="check">✓ (WAF v2)</td><td class="check">✓ (Premium)</td><td class="cross">✗</td></tr>
+        <tr><td>DDoS Protection</td><td class="partial">⚡ Basic</td><td class="partial">⚡ Via WAF</td><td class="check">✓ Built-in</td><td class="cross">✗</td></tr>
+        <tr><td>CDN / Caching</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓</td><td class="cross">✗</td></tr>
+        <tr><td>Global Load Balancing</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td></tr>
+        <tr><td>Multi-Region Failover</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓ (Instant)</td><td class="check">✓ (DNS TTL)</td></tr>
+        <tr><td>Health Probes</td><td>TCP/HTTP/HTTPS</td><td>HTTP/HTTPS</td><td>HTTP/HTTPS</td><td>HTTP/HTTPS/TCP</td></tr>
+        <tr><td>Session Affinity</td><td class="partial">⚡ IP-hash</td><td class="check">✓ Cookie-based</td><td class="check">✓ Cookie-based</td><td class="partial">⚡ Session routing</td></tr>
+        <tr><td>Autoscaling</td><td class="check">✓ Automatic</td><td class="check">✓ (v2)</td><td class="check">✓ Global PoPs</td><td class="check">✓ DNS-tier</td></tr>
+        <tr><td>Non-Azure Endpoints</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓ Any IP/FQDN</td></tr>
+        <tr><td>Latency to Data Path</td><td>&lt; 1ms</td><td>2–5ms</td><td>Edge PoP nearby</td><td>None added</td></tr>
+        <tr><td>Private / Internal</td><td class="check">✓ ILB</td><td class="check">✓ Private</td><td class="partial">⚡ Private Link</td><td class="cross">✗ Public DNS</td></tr>
+        <tr><td>HTTP/2 & HTTP/3</td><td class="cross">✗</td><td class="check">✓ HTTP/2</td><td class="check">✓ HTTP/2 + HTTP/3</td><td class="cross">✗</td></tr>
+        <tr><td>Pricing Model</td><td>Rules + Data</td><td>Capacity Units</td><td>Usage + Data</td><td>DNS Queries</td></tr>
+        <tr><td>SLA</td><td>99.99% (Std)</td><td>99.95% (v2)</td><td>99.99%</td><td>99.99%</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ─── DECISION GUIDE ─── -->
+<section class="section reveal">
+  <p class="section-label">Decision Guide</p>
+  <h2 class="section-title">Which One Should You Use?</h2>
+  <p class="section-desc">Answer these questions to quickly identify the right Azure load-balancing service for your scenario.</p>
+
+  <div class="decision-grid">
+    <div class="decision-card">
+      <h3>🌍 Scope</h3>
+      <div class="dc-q">Is your workload within a single Azure region, or does it span multiple regions globally?</div>
+      <span class="dc-ans ans-alb">Single region → ALB or App Gateway</span><br><br>
+      <span class="dc-ans ans-fd">Multi-region HTTP → Front Door</span><br><br>
+      <span class="dc-ans ans-tm">Multi-region any protocol → Traffic Manager</span>
+    </div>
+
+    <div class="decision-card">
+      <h3>🔌 Protocol</h3>
+      <div class="dc-q">What protocol does your application use — HTTP/HTTPS, or something else like TCP, UDP, RDP, SMTP?</div>
+      <span class="dc-ans ans-alb">TCP / UDP / non-HTTP → Azure Load Balancer</span><br><br>
+      <span class="dc-ans ans-agw">HTTP / HTTPS → App Gateway or Front Door</span><br><br>
+      <span class="dc-ans ans-tm">Any protocol (DNS routing) → Traffic Manager</span>
+    </div>
+
+    <div class="decision-card">
+      <h3>🛡️ Security</h3>
+      <div class="dc-q">Do you need a Web Application Firewall (WAF) to protect against OWASP Top 10 or DDoS attacks?</div>
+      <span class="dc-ans ans-agw">Regional WAF → App Gateway WAF v2</span><br><br>
+      <span class="dc-ans ans-fd">Global WAF + DDoS → Front Door Premium</span>
+    </div>
+
+    <div class="decision-card">
+      <h3>📡 CDN & Caching</h3>
+      <div class="dc-q">Do you need to cache static content at the edge to reduce origin load and latency globally?</div>
+      <span class="dc-ans ans-fd">✓ Front Door Standard/Premium</span>
+    </div>
+
+    <div class="decision-card">
+      <h3>🔁 Routing Complexity</h3>
+      <div class="dc-q">Do you need to route traffic based on URL paths, hostnames, request headers, or geographic location?</div>
+      <span class="dc-ans ans-agw">Path/host routing (regional) → App Gateway</span><br><br>
+      <span class="dc-ans ans-fd">Path/host/geo routing (global) → Front Door</span><br><br>
+      <span class="dc-ans ans-tm">Geographic / DNS routing → Traffic Manager</span>
+    </div>
+
+    <div class="decision-card">
+      <h3>🏢 Hybrid / Multi-Cloud</h3>
+      <div class="dc-q">Do your backends include on-premises servers or resources in other cloud providers (AWS, GCP)?</div>
+      <span class="dc-ans ans-tm">Traffic Manager (any public endpoint)</span><br><br>
+      <span class="dc-ans ans-fd">Front Door (custom origins)</span>
+    </div>
+
+    <div class="decision-card">
+      <h3>💸 Cost Priority</h3>
+      <div class="dc-q">Are you optimizing for lowest cost with simple infrastructure load balancing inside a VNet?</div>
+      <span class="dc-ans ans-alb">✓ Azure Load Balancer (Standard)</span>
+    </div>
+
+    <div class="decision-card">
+      <h3>⚡ Ultra-Low Latency</h3>
+      <div class="dc-q">Do you need sub-millisecond latency (gaming, trading, real-time systems) without proxy overhead?</div>
+      <span class="dc-ans ans-alb">✓ Azure Load Balancer</span>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ─── COMBINATION PATTERNS ─── -->
+<section class="section reveal">
+  <p class="section-label">Patterns</p>
+  <h2 class="section-title">Common Architecture Combinations</h2>
+  <p class="section-desc">These services are frequently combined to address complex enterprise requirements.</p>
+
+  <div class="osi-grid">
+    <div class="lb-card card-fd">
+      <div class="card-name" style="margin-bottom:0.5rem">🌐 + 🛡️ Global + Regional WAF</div>
+      <div class="card-desc">Front Door (global CDN + anycast) in front of Application Gateway (regional WAF + path routing) in front of AKS or App Service. Two layers of WAF protection.</div>
+      <div style="font-family:'DM Mono',monospace;font-size:0.75rem;color:var(--muted);margin-top:0.75rem">User → FD Edge → App Gateway → AKS</div>
+    </div>
+    <div class="lb-card card-tm">
+      <div class="card-name" style="margin-bottom:0.5rem">🗺️ + ⚖️ DNS + L4 Internal</div>
+      <div class="card-desc">Traffic Manager routes DNS to regional Azure Load Balancers. Best for non-HTTP multi-region apps needing global failover with low-latency in-region distribution.</div>
+      <div style="font-family:'DM Mono',monospace;font-size:0.75rem;color:var(--muted);margin-top:0.75rem">DNS → TM → Regional ALB → VMs</div>
+    </div>
+    <div class="lb-card card-agw">
+      <div class="card-name" style="margin-bottom:0.5rem">🛡️ + ⚖️ L7 + L4 Tier</div>
+      <div class="card-desc">Application Gateway handles web tier (HTTP), Azure Load Balancer handles app/db tier (TCP). Classic two-tier architecture for multi-tier web applications.</div>
+      <div style="font-family:'DM Mono',monospace;font-size:0.75rem;color:var(--muted);margin-top:0.75rem">Internet → AGW → Web VMs → ILB → DB VMs</div>
+    </div>
+    <div class="lb-card card-alb">
+      <div class="card-name" style="margin-bottom:0.5rem">🌐 + 🗺️ Active-Active Global</div>
+      <div class="card-desc">Front Door for HTTP global acceleration paired with Traffic Manager for non-HTTP or failover DNS-level control across regions and cloud providers.</div>
+      <div style="font-family:'DM Mono',monospace;font-size:0.75rem;color:var(--muted);margin-top:0.75rem">HTTP → FD | TCP → TM → Regional Endpoints</div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Built as a reference guide · <strong>Azure Load Balancers</strong> · All features reflect Azure documentation · Not affiliated with Microsoft
+</footer>
+
+<script>
+  // Accordion toggle
+  function toggle(bodyId, header) {
+    const body = document.getElementById(bodyId);
+    const chevron = header.querySelector('.chevron');
+    body.classList.toggle('open');
+    chevron.style.transform = body.classList.contains('open') ? 'rotate(180deg)' : '';
+  }
+
+  // Smooth scroll to section
+  function scrollTo(id) {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Auto-open the accordion
+    const body = document.getElementById(id + '-body');
+    const header = el.querySelector('.detail-header');
+    if (body && !body.classList.contains('open')) toggle(id + '-body', header);
+  }
+
+  // Scroll reveal
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>

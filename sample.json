@@ -1,0 +1,40 @@
+{
+    "TrainingModule": "AzureDevops with AI",
+    "TrainerName": "Ramakrishna",
+    "ContactNumber": 9513184144,
+    "Address": {
+        "Street": "123 Main St",
+        "City": "Hyderabad",
+        "State": "Telangana",
+        "ZipCode": "500001"
+    },
+
+    "Participants": [
+        {
+            "Name": "Dasun",
+            "Location": "Dubai",
+            "IsAzureAdmin": true
+        },
+        {
+            "Name": "Devender",
+            "Location": "Singapore",
+            "IsAzureAdmin": true
+        },
+        {
+            "Name": "Guru",
+            "Location": "Hyderabad",
+            "IsAzureAdmin": false
+        },
+        {
+            "Name": "Shika",
+            "Location": "Canada",
+            "IsAzureAdmin": true
+        },
+        {
+            "Name": "Magesh",
+            "Location": "Poland",
+            "IsAzureAdmin": false
+        }
+    ],
+    "MCTStatus": null
+}

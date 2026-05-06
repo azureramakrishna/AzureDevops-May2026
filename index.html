@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Azure Storage — Complete Reference</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --azure: #0078d4;
+      --azure-light: #50a8f5;
+      --azure-deep: #004e8c;
+      --accent: #00b4d8;
+      --accent2: #f7c948;
+      --bg: #050d1a;
+      --surface: #0a1628;
+      --surface2: #0f2040;
+      --border: rgba(0,120,212,0.25);
+      --text: #e8f4ff;
+      --muted: #7da8cc;
+      --font-head: 'Syne', sans-serif;
+      --font-body: 'IBM Plex Sans', sans-serif;
+      --font-mono: 'IBM Plex Mono', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 15px;
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    /* ── Background grid ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,120,212,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,120,212,0.05) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── HERO ── */
+    .hero {
+      position: relative;
+      z-index: 1;
+      padding: 80px 48px 60px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .hero-badge {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: rgba(0,180,216,0.1);
+      border: 1px solid rgba(0,180,216,0.3);
+      padding: 4px 14px;
+      border-radius: 2px;
+      margin-bottom: 28px;
+      animation: fadeDown 0.6s ease both;
+    }
+    .hero h1 {
+      font-family: var(--font-head);
+      font-size: clamp(38px, 6vw, 72px);
+      font-weight: 800;
+      line-height: 1.05;
+      animation: fadeDown 0.7s ease 0.1s both;
+    }
+    .hero h1 span {
+      background: linear-gradient(135deg, var(--azure-light), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub {
+      margin-top: 20px;
+      font-size: 17px;
+      color: var(--muted);
+      max-width: 580px;
+      font-weight: 300;
+      animation: fadeDown 0.7s ease 0.2s both;
+    }
+    .hero-divider {
+      margin-top: 48px;
+      height: 1px;
+      background: linear-gradient(90deg, var(--azure), transparent);
+      animation: fadeRight 1s ease 0.5s both;
+    }
+
+    /* ── MAIN LAYOUT ── */
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 48px 100px;
+    }
+
+    /* ── SECTION HEADERS ── */
+    .section { margin-top: 72px; }
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--azure-light);
+      margin-bottom: 10px;
+      opacity: 0.7;
+    }
+    .section-title {
+      font-family: var(--font-head);
+      font-size: clamp(22px, 3vw, 32px);
+      font-weight: 700;
+      margin-bottom: 32px;
+      position: relative;
+      display: inline-block;
+    }
+    .section-title::after {
+      content: '';
+      display: block;
+      height: 3px;
+      width: 48px;
+      background: var(--accent);
+      margin-top: 10px;
+    }
+
+    /* ── CARDS GRID ── */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: var(--azure);
+      box-shadow: 0 16px 48px rgba(0,120,212,0.2);
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--azure), var(--accent));
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.3s ease;
+    }
+    .card:hover::before { transform: scaleX(1); }
+
+    .card-icon {
+      font-size: 28px;
+      margin-bottom: 14px;
+      display: block;
+    }
+    .card-tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: rgba(0,180,216,0.1);
+      padding: 2px 8px;
+      border-radius: 2px;
+      margin-bottom: 10px;
+      display: inline-block;
+    }
+    .card h3 {
+      font-family: var(--font-head);
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: #fff;
+    }
+    .card p {
+      color: var(--muted);
+      font-size: 13.5px;
+      line-height: 1.65;
+    }
+
+    /* ── REDUNDANCY TABLE ── */
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+    }
+    thead {
+      background: var(--surface2);
+    }
+    thead th {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--azure-light);
+      padding: 14px 18px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody tr {
+      border-bottom: 1px solid rgba(0,120,212,0.1);
+      transition: background 0.15s;
+    }
+    tbody tr:hover { background: rgba(0,120,212,0.07); }
+    tbody tr:last-child { border-bottom: none; }
+    tbody td {
+      padding: 13px 18px;
+      color: var(--muted);
+      vertical-align: top;
+    }
+    tbody td:first-child {
+      color: var(--text);
+      font-weight: 500;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      font-weight: 500;
+    }
+    .pill-green  { background: rgba(0,200,100,0.12); color: #34d058; border: 1px solid rgba(52,208,88,0.25); }
+    .pill-blue   { background: rgba(0,120,212,0.15); color: var(--azure-light); border: 1px solid rgba(0,120,212,0.3); }
+    .pill-yellow { background: rgba(247,201,72,0.12); color: var(--accent2); border: 1px solid rgba(247,201,72,0.25); }
+    .pill-red    { background: rgba(255,80,80,0.1); color: #ff6b6b; border: 1px solid rgba(255,80,80,0.25); }
+
+    /* ── SERVICE TYPES ── */
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+      gap: 16px;
+    }
+    .service-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 24px 24px 20px;
+      position: relative;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .service-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 36px rgba(0,120,212,0.18);
+    }
+    .service-num {
+      position: absolute;
+      top: 16px; right: 20px;
+      font-family: var(--font-mono);
+      font-size: 36px;
+      font-weight: 700;
+      color: rgba(0,120,212,0.1);
+      line-height: 1;
+      pointer-events: none;
+      user-select: none;
+    }
+    .service-card h3 {
+      font-family: var(--font-head);
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #fff;
+    }
+    .service-card .sub {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent);
+      margin-bottom: 12px;
+      letter-spacing: 0.06em;
+    }
+    .service-card p {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .service-card ul {
+      margin-top: 10px;
+      padding-left: 16px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .service-card ul li { margin-bottom: 4px; }
+
+    /* ── ACCESS TIERS ── */
+    .tiers {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+    }
+    .tier {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 22px;
+      text-align: center;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .tier:hover { transform: scale(1.03); border-color: var(--azure); }
+    .tier-icon { font-size: 32px; margin-bottom: 10px; }
+    .tier h4 {
+      font-family: var(--font-head);
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #fff;
+    }
+    .tier p { font-size: 12.5px; color: var(--muted); }
+    .tier .cost {
+      margin-top: 10px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent2);
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 36px 24px;
+      border-top: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: rgba(125,168,204,0.5);
+      letter-spacing: 0.06em;
+    }
+    footer span { color: var(--azure-light); }
+
+    /* ── ANIMATIONS ── */
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeRight {
+      from { opacity: 0; transform: scaleX(0); transform-origin: left; }
+      to   { opacity: 1; transform: scaleX(1); }
+    }
+
+    /* ── Scroll reveal ── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* NAV */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(5,13,26,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 48px;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      height: 52px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    nav .logo {
+      color: var(--azure-light);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      margin-right: 16px;
+      white-space: nowrap;
+    }
+    nav a {
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.15s;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+    nav a:hover { color: var(--text); }
+
+    @media (max-width: 768px) {
+      .hero, .container { padding-left: 24px; padding-right: 24px; }
+      nav { padding: 0 24px; gap: 20px; overflow-x: auto; }
+      nav a:nth-child(n+5) { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="logo">⬡ Azure Storage</span>
+  <a href="#account-types">Account Types</a>
+  <a href="#redundancy">Redundancy</a>
+  <a href="#services">Services</a>
+  <a href="#tiers">Access Tiers</a>
+  <a href="#security">Security</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">Microsoft Azure · Cloud Storage Reference</div>
+  <h1>Azure Storage<br><span>Complete Reference</span></h1>
+  <p class="hero-sub">
+    A structured guide to Azure Storage account types, redundancy models,
+    service offerings, access tiers, and security capabilities.
+  </p>
+  <div class="hero-divider"></div>
+</section>
+
+<div class="container">
+
+  <!-- ── ACCOUNT TYPES ── -->
+  <section class="section reveal" id="account-types">
+    <div class="section-label">01 — Account Types</div>
+    <h2 class="section-title">Storage Account Types</h2>
+    <div class="cards">
+
+      <div class="card">
+        <span class="card-icon">🏦</span>
+        <span class="card-tag">General Purpose v2</span>
+        <h3>Standard GPv2</h3>
+        <p>The recommended account type for most scenarios. Supports Blob, File, Queue, Table, and Data Lake Storage Gen2. Supports all redundancy options and access tiers.</p>
+      </div>
+
+      <div class="card">
+        <span class="card-icon">⚡</span>
+        <span class="card-tag">Premium</span>
+        <h3>Premium Block Blobs</h3>
+        <p>High-performance storage for block blob and append blob workloads requiring low-latency. Ideal for AI/ML, analytics, and interactive workloads with high transaction rates.</p>
+      </div>
+
+      <div class="card">
+        <span class="card-icon">📁</span>
+        <span class="card-tag">Premium</span>
+        <h3>Premium File Shares</h3>
+        <p>SSD-backed file shares for enterprise or high-performance applications. Supports both SMB and NFS protocols. Use for HPC, databases, and latency-sensitive workloads.</p>
+      </div>
+
+      <div class="card">
+        <span class="card-icon">💾</span>
+        <span class="card-tag">Premium</span>
+        <h3>Premium Page Blobs</h3>
+        <p>Optimised for random read/write operations. Primarily used for Azure Virtual Machine OS and data disks, Oracle databases, and other I/O-intensive workloads.</p>
+      </div>
+
+      <div class="card">
+        <span class="card-icon">🗄️</span>
+        <span class="card-tag">Legacy</span>
+        <h3>Standard GPv1</h3>
+        <p>Older general-purpose account — supports all storage services but lacks access tiering and some newer features. Microsoft recommends upgrading to GPv2 for most use cases.</p>
+      </div>
+
+      <div class="card">
+        <span class="card-icon">📦</span>
+        <span class="card-tag">Legacy</span>
+        <h3>Blob Storage (Legacy)</h3>
+        <p>Supports only block blobs and append blobs. Introduced access tiers (Hot/Cool/Archive). Largely superseded by Standard GPv2 which offers the same capabilities and more.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── REDUNDANCY ── -->
+  <section class="section reveal" id="redundancy">
+    <div class="section-label">02 — Redundancy</div>
+    <h2 class="section-title">Redundancy Options</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Option</th>
+            <th>Full Name</th>
+            <th>Copies</th>
+            <th>Scope</th>
+            <th>Read Access</th>
+            <th>Durability</th>
+            <th>Best For</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>LRS</td>
+            <td>Locally Redundant Storage</td>
+            <td>3</td>
+            <td>Single datacenter</td>
+            <td><span class="pill pill-blue">Primary only</span></td>
+            <td>11 nines</td>
+            <td>Dev/test, low-cost backup</td>
+          </tr>
+          <tr>
+            <td>ZRS</td>
+            <td>Zone-Redundant Storage</td>
+            <td>3</td>
+            <td>3 Availability Zones (1 region)</td>
+            <td><span class="pill pill-blue">Primary only</span></td>
+            <td>12 nines</td>
+            <td>High availability, zone failure protection</td>
+          </tr>
+          <tr>
+            <td>GRS</td>
+            <td>Geo-Redundant Storage</td>
+            <td>6</td>
+            <td>Primary + Secondary region</td>
+            <td><span class="pill pill-yellow">Secondary on failover</span></td>
+            <td>16 nines</td>
+            <td>Disaster recovery, business continuity</td>
+          </tr>
+          <tr>
+            <td>GZRS</td>
+            <td>Geo-Zone-Redundant Storage</td>
+            <td>6</td>
+            <td>3 AZs primary + Secondary region</td>
+            <td><span class="pill pill-yellow">Secondary on failover</span></td>
+            <td>16 nines</td>
+            <td>Maximum HA + geo-redundancy</td>
+          </tr>
+          <tr>
+            <td>RA-GRS</td>
+            <td>Read-Access Geo-Redundant</td>
+            <td>6</td>
+            <td>Primary + Secondary region</td>
+            <td><span class="pill pill-green">Always readable</span></td>
+            <td>16 nines</td>
+            <td>Read-heavy globally distributed apps</td>
+          </tr>
+          <tr>
+            <td>RA-GZRS</td>
+            <td>Read-Access Geo-Zone-Redundant</td>
+            <td>6</td>
+            <td>3 AZs primary + Secondary region</td>
+            <td><span class="pill pill-green">Always readable</span></td>
+            <td>16 nines</td>
+            <td>Critical workloads needing max resilience</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── SERVICES ── -->
+  <section class="section reveal" id="services">
+    <div class="section-label">03 — Services</div>
+    <h2 class="section-title">Storage Service Types</h2>
+    <div class="services-grid">
+
+      <div class="service-card">
+        <span class="service-num">01</span>
+        <h3>Azure Blob Storage</h3>
+        <div class="sub">Object Storage · REST API</div>
+        <p>Massively scalable object store for unstructured data — documents, images, videos, logs, and backups.</p>
+        <ul>
+          <li>Block Blobs — large file uploads</li>
+          <li>Append Blobs — log data, telemetry</li>
+          <li>Page Blobs — random read/write (VHDs)</li>
+          <li>Data Lake Storage Gen2 (hierarchical namespace)</li>
+        </ul>
+      </div>
+
+      <div class="service-card">
+        <span class="service-num">02</span>
+        <h3>Azure Files</h3>
+        <div class="sub">Managed File Shares · SMB / NFS</div>
+        <p>Fully managed cloud file shares accessible via SMB 3.x and NFS 4.1 protocols — lift-and-shift of on-premises file servers.</p>
+        <ul>
+          <li>Azure File Sync (hybrid caching)</li>
+          <li>Identity-based access (AD, AAD DS)</li>
+          <li>Snapshots for point-in-time recovery</li>
+        </ul>
+      </div>
+
+      <div class="service-card">
+        <span class="service-num">03</span>
+        <h3>Azure Queue Storage</h3>
+        <div class="sub">Message Queue · Async Decoupling</div>
+        <p>Simple, reliable message queueing for asynchronous communication between application components at scale.</p>
+        <ul>
+          <li>Up to 64 KB per message</li>
+          <li>Millions of messages per queue</li>
+          <li>TTL, visibility timeout support</li>
+        </ul>
+      </div>
+
+      <div class="service-card">
+        <span class="service-num">04</span>
+        <h3>Azure Table Storage</h3>
+        <div class="sub">NoSQL · Key-Value Store</div>
+        <p>Schemaless NoSQL key-value store ideal for structured, non-relational data at low cost. Part of Cosmos DB Table API ecosystem.</p>
+        <ul>
+          <li>Fast queries via partition + row keys</li>
+          <li>Auto-scaling throughput</li>
+          <li>Fully compatible with Cosmos DB Table API</li>
+        </ul>
+      </div>
+
+      <div class="service-card">
+        <span class="service-num">05</span>
+        <h3>Azure Disk Storage</h3>
+        <div class="sub">Managed Disks · VM Block Storage</div>
+        <p>Block-level storage volumes used with Azure Virtual Machines. Managed and unmanaged disk options available.</p>
+        <ul>
+          <li>Ultra Disk — sub-ms latency</li>
+          <li>Premium SSD v2 — production workloads</li>
+          <li>Standard HDD — dev/test, backups</li>
+        </ul>
+      </div>
+
+      <div class="service-card">
+        <span class="service-num">06</span>
+        <h3>Azure Data Lake Gen2</h3>
+        <div class="sub">Analytics · Hierarchical Namespace</div>
+        <p>Built on Blob Storage with a hierarchical namespace enabled. Optimised for enterprise big data analytics using Hadoop-compatible APIs.</p>
+        <ul>
+          <li>POSIX-like ACLs</li>
+          <li>Works with Databricks, Synapse, HDInsight</li>
+          <li>ABFS driver for Hadoop workloads</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── ACCESS TIERS ── -->
+  <section class="section reveal" id="tiers">
+    <div class="section-label">04 — Access Tiers</div>
+    <h2 class="section-title">Blob Access Tiers</h2>
+    <div class="tiers">
+      <div class="tier">
+        <div class="tier-icon">🔥</div>
+        <h4>Hot</h4>
+        <p>Frequently accessed data. Highest storage cost, lowest access cost.</p>
+        <div class="cost">High storage · Low access</div>
+      </div>
+      <div class="tier">
+        <div class="tier-icon">❄️</div>
+        <h4>Cool</h4>
+        <p>Infrequently accessed data stored for at least 30 days.</p>
+        <div class="cost">Lower storage · Higher access</div>
+      </div>
+      <div class="tier">
+        <div class="tier-icon">🧊</div>
+        <h4>Cold</h4>
+        <p>Rarely accessed data, minimum retention of 90 days. Introduced 2023.</p>
+        <div class="cost">Low storage · High access</div>
+      </div>
+      <div class="tier">
+        <div class="tier-icon">🗃️</div>
+        <h4>Archive</h4>
+        <p>Offline tier for data stored ≥180 days. Rehydration required to access (hours).</p>
+        <div class="cost">Lowest storage · Highest access</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SECURITY ── -->
+  <section class="section reveal" id="security">
+    <div class="section-label">05 — Security &amp; Management</div>
+    <h2 class="section-title">Security &amp; Key Features</h2>
+    <div class="cards">
+
+      <div class="card">
+        <span class="card-icon">🔐</span>
+        <span class="card-tag">Encryption</span>
+        <h3>Storage Service Encryption</h3>
+        <p>All data is encrypted at rest using AES-256 by default. Supports Microsoft-managed keys (MMK), customer-managed keys (CMK) via Azure Key Vault, and customer-provided keys.</p>
+      </div>
+
+      <div class="card">
+        <span class="card-icon">🌐</span>
+        <span class="card-tag">Network</span>
+        <h3>Network Security</h3>
+        <p>Restrict access using service endpoints, private endpoints (Private Link), IP firewall rules, and virtual network rules. Supports trusted Microsoft services bypass.</p>
+      </div>
+
+      <div class="card">
+        <span class="card-icon">🪪</span>
+        <span class="card-tag">Identity</span>
+        <h3>Azure AD &amp; RBAC</h3>
+        <p>Role-Based Access Control via Azure Active Directory for fine-grained permissions. Built-in roles include Storage Blob Data Owner, Contributor, and Reader.</p>
+      </div>
+
+      <div class="card">
+        <span class="card-icon">🔑</span>
+        <span class="card-tag">Delegation</span>
+        <h3>Shared Access Signatures</h3>
+        <p>Grant time-limited, scoped access to storage resources without exposing account keys. Supports Service SAS, Account SAS, and User Delegation SAS (recommended).</p>
+      </div>
+
+      <div class="card">
+        <span class="card-icon">🛡️</span>
+        <span class="card-tag">Protection</span>
+        <h3>Data Protection</h3>
+        <p>Soft delete for blobs, containers, and file shares. Blob versioning, point-in-time restore, and immutable storage (WORM) for compliance-regulated workloads.</p>
+      </div>
+
+      <div class="card">
+        <span class="card-icon">📊</span>
+        <span class="card-tag">Monitoring</span>
+        <h3>Monitoring &amp; Diagnostics</h3>
+        <p>Azure Monitor metrics, diagnostic logs via Log Analytics, Storage Analytics, and Microsoft Defender for Storage for threat detection and anomaly alerts.</p>
+      </div>
+
+    </div>
+  </section>
+
+</div><!-- /container -->
+
+<footer>
+  Azure Storage Reference &nbsp;·&nbsp; <span>Microsoft Azure</span> &nbsp;·&nbsp; Content accurate as of 2024–2025
+</footer>
+
+<script>
+  // Scroll reveal
+  const reveals = document.querySelectorAll('.reveal');
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); } });
+  }, { threshold: 0.08 });
+  reveals.forEach(r => io.observe(r));
+</script>
+</body>
+</html>
