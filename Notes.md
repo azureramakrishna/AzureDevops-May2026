@@ -531,3 +531,45 @@ JSON Data types:
 
 Azure Bicep:
 ===========
+
+
+Terraform:
+=========
+
+ARMTemplates                             Azure Bicep                                Terraform
+============                             ===========                                ==========
+1. IAC                                   1. IAC                                     1. IAC
+2. Specific to Azure                     2. Specific to Azure                       2. Open source (Azure, AWS, GCP, Onprem etc)
+3. JSON format                           3. Domain specific format                  3. HCL (Hashicorp configuration language) format
+4. exptension template.json              4. extension main.bicep                    4. extension main.tf          
+5. template.json                         5. main.bicep                              5. main.tf
+   parameters.json                          main.bicepparam                            variables.tf
+6. az deploymnet group create \          6. az deploymnet group create \            6.  Terraform init
+   -g demo --template-file a.json           -g demo --template-file a.json              Terraform validate
+   --parameters b.json                      --parameters b.json                         Terraform fmt
+                                                                                        Terraform plan
+                                                                                        Terraform apply 
+                                                                                        Terraform destroy
+7. Structure:                           7. param                                    7. Building blocks:
+   Shcema                                  var                                          provider
+   contentversion                          resources                                    resources
+   parameters                              outputs                                      outputs
+   variables
+   resources
+   outputs
+
+
+Get started with terraform:
+==========================
+
+download terraform: https://developer.hashicorp.com/terraform/install#windows
+
+terraform version : v1.15.2 / v1.14.8
+terraform Azure provider version: 4.71.0 
+
+Terraform init - Intialize the backend & install the provider plugins
+Terraform fmt  - It formats the terraform templates
+Terraform validate - It does syntax validation of the templates
+Terraform plan - The plan of the deployment, Plan: 2 add, 0 change, 0 destroy 
+Terraform apply - Its going to deploy the resources on the target platform 
+Terraform destroy - delete all the resources as per template
