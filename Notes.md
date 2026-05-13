@@ -573,3 +573,27 @@ Terraform validate - It does syntax validation of the templates
 Terraform plan - The plan of the deployment, Plan: 2 add, 0 change, 0 destroy 
 Terraform apply - Its going to deploy the resources on the target platform 
 Terraform destroy - delete all the resources as per template
+
+
+scenario1:
+main.tf --> vm --> datadisk manually 
+
+main.tf --> terraform.tfstate -->
+
+terraform plan 
+
+No changes
+
+scenario2:
+main.tf -> vm --> changed the size of the VM manually 
+Standard_DS1_v2 --> Standard_D2S_v3
+
+terraform drift --> terraform plan
+
+scenario3:
+main.tf --> vm --> deleted manually 
+
+terraform plan / apply
+
+scenario4:
+terraform taints
