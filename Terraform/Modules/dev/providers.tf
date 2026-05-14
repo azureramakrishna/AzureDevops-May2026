@@ -1,0 +1,19 @@
+# Azurerm terraform provider version
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "4.70.0"
+    }
+  }
+}
+
+# Azure Terraform Provider Configuration
+provider "azurerm" {
+  features {}
+
+  client_id       = "35b37932-7b61-44a2-bc5f-d40b4ce53dcf"
+  client_secret   = "--- IGNORE ---"
+  tenant_id       = "459865f1-a8aa-450a-baec-8b47a9e5c904"
+  subscription_id = "2e28c82c-17d7-4303-b27a-4141b3d4088f"
+}
