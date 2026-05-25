@@ -1,6 +1,6 @@
 variable "resource_group_name" {
   type        = string
-  default     = "saanvikit-tf-rg"
+  default     = "github-tf-rg"
   description = "Name of the resource group"
 }
 
@@ -13,13 +13,13 @@ variable "location" {
 
 variable "storage_account_name" {
   type    = string
-  default = "saanvikit202605"
+  default = "githubsa202645"
 }
 
 variable "tags" {
   type = map(string)
   default = {
-    "Project"     = "SAANVIKIT"
+    "Project"     = "GITHUB"
     "Owner"       = "RK"
     "Environment" = "DEV"
   }
@@ -46,5 +46,5 @@ variable "admin_user" {
 }
 
 variable "admin_password" {
-  type    = string
+  type = string
 }

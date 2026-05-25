@@ -1,5 +1,5 @@
 locals {
-  prefix = "saanvikit"
+  prefix = "github"
 }
 
 # Azurerm terraform provider version
@@ -20,10 +20,10 @@ provider "azurerm" {
 # Terraform backend configuration for Azure Storage Account
 terraform {
   backend "azurerm" {
-    resource_group_name  = "terraform-state-rg"
-    storage_account_name = "terraformstatesa758"
+    resource_group_name  = "rg-statefile"
+    storage_account_name = "statefilesa2026"
     container_name       = "tfstate"
-    key                  = "terraform.tfstate"
+    key                  = "github.terraform.tfstate"
   }
 }
 
