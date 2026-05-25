@@ -597,3 +597,92 @@ terraform plan / apply
 
 scenario4:
 terraform taints
+
+# Terraform Lab
+
+1. Create Azure VM using terraform (rg, sa, vnet, snet, nsg, nic, pip, vm, datadisk)
+2. I already have a rg, vnet, subnet, keyvault with secrets. can you do the a new VM deployment using them (data sources)
+3. Create azure webapp using the terraform 
+
+
+
+Azure Boards:
+============
+
+Agile process
+
+Backlogs : what are deliverables we have (PMO/Scrum mater)
+
+sprints - 2 weeks 
+
+sprint1 - May 18 to May 29
+sprint2 - June 1 to June 12
+sprint2 - June 15 to June 26
+
+Sprint planning:
+    capacity planning 
+    user stories 
+    create task and work
+
+Daily standup calls - 15/30min
+
+
+Retrospective: 
+    what went well
+    what didn't went well
+    what can be improved
+
+
+Agile process:
+=============
+
+Epic
+    \_
+        Feature
+            \_
+                Userstories
+                    \_
+                        task / issues
+
+
+
+Amazon.in 
+
+Singup page
+Login page
+Home page 
+Product catalog 
+billing / payment gateway
+shipping tracking 
+support 
+
+
+Azure Repo's: Git/GitHub
+============
+
+
+Azure Pipelines:
+===============
+
+Developer --> Vscode --> Azure Repo's --> Azure Pipelines --> Azure subscription 
+
+
+Pre-requisites:
+==============
+
+1. Service Connection  - Azure Resource Manager (ARM)
+    - Service Principal 
+
+2. Agent Pool
+    - Microsoft Hosted Agent
+    - Self Hosted Agent 
+
+
+
+Azure Pipelines:
+
+Secrets:
+    - Pipeline variables 
+    - Library --> Varible group (Keyvault)
+
+    Mqm8Q~eJCS6OvP-Uein72PHXa0PDle0vWs0S.ca0
